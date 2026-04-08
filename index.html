@@ -378,7 +378,7 @@
             statusBox.style.display = 'none';
 
             try {
-                const response = await fetch('https://virtual-pit-wall-api.onrender.com', {
+                const response = await fetch('https://virtual-pit-wall-api.onrender.com/api/simulate', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
