@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual Pit Wall | Predictive F1 Strategy</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* --- Professional F1 Theme Variables --- */
+        :root {
+            --bg-base: #0b0c10;
+            --bg-panel: #15171e;
+            --bg-hover: #1f222b;
+            --text-main: #f8fafc;
+            --text-muted: #8b92a5;
+            --border-color: #2a2d3d;
+            --f1-red: #e10600;
+            --accent-blue: #00d2be;
+            --accent-purple: #b91c1c; 
+            --success: #10b981;
+            --pb-purple: #c026d3; 
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --font-ui: 'Inter', -apple-system, sans-serif;
+            --font-data: 'Roboto Mono', 'Courier New', monospace;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font-ui); }
+        body { background-color: var(--bg-base); color: var(--text-main); height: 100vh; overflow: hidden; }
+
+        /* ==========================================
+           1. LANDING PAGE
+           ========================================== */
+        #landing-page {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: radial-gradient(circle at center, #1a1c24 0%, var(--bg-base) 80%);
+            z-index: 100; transition: opacity 0.6s ease;
+        }
+        .grid-bg {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background-size: 40px 40px;
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                              linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            z-index: -1; pointer-events: none;
+        }
+        .landing-content { text-align: center; max-width: 700px; padding: 2rem; }
+        .landing-title { font-size: 4rem; font-weight: 900; letter-spacing: -1px; margin-bottom: 1rem; text-transform: uppercase; }
+        .landing-title span { color: var(--f1-red); }
+        .landing-desc { font-size: 1.1rem; color: var(--text-muted); margin-bottom: 3rem; line-height: 1.6; }
+        .btn-launch {
+            background-color: var(--f1-red); color: white; font-size: 1rem; font-weight: bold;
+            padding: 1rem 3rem; border: none; border-radius: 4px; cursor: pointer;
+            text-transform: uppercase; letter-spacing: 1px; transition: 0.2s;
+        }
+        .btn-launch:hover { background-color: #ff1a1a; transform: translateY(-2px); box-shadow: 0 4px 15px rgba(225, 6, 0, 0.3); }
+
+        /* ==========================================
+           2. APP LAYOUT & SIDEBAR
+           ========================================== */
+        #app-container { display: none; height: 100vh; width: 100%; }
+        
+        .sidebar { width: 260px; background-color: var(--bg-panel); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 20; }
+        .brand { padding: 1.5rem; border-bottom: 1px solid var(--border-color); }
+        .brand h1 { font-size: 1.2rem; font-weight: 900; text-transform: uppercase; }
+        .brand h1 span { color: var(--f1-red); }
+        .brand p { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem; }
+
+        .nav-menu { flex: 1; padding: 1.5rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; overflow-y: auto;}
+        .nav-item { 
+            padding: 0.85rem 1rem; border-radius: 6px; color: var(--text-muted); 
+            cursor: pointer; font-size: 0.85rem; font-weight: 600; 
+            transition: all 0.2s; border: 1px solid transparent; text-align: left; 
+            background: none;
+        }
+        .nav-item:hover { background-color: var(--bg-hover); color: var(--text-main); }
+        .nav-item.active { background-color: rgba(225, 6, 0, 0.1); color: var(--f1-red); border-color: rgba(225, 6, 0, 0.2); }
+        .nav-section { margin: 1rem 0 0.5rem 1rem; font-size: 0.7rem; color: #5a5f73; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+
+        .team-info { padding: 1.5rem; border-top: 1px solid var(--border-color); font-size: 0.75rem; color: var(--text-muted); line-height: 1.6; }
+
+        /* ==========================================
+           3. MAIN WORKSPACE & PANELS
+           ========================================== */
+        .main-content { flex: 1; display: flex; flex-direction: column; position: relative; }
+        .header { padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); background-color: var(--bg-panel); }
+        
+        /* --- Health Status Badge Styling --- */
+        .status-badge { 
+            display: flex; align-items: center; gap: 0.5rem; font-family: var(--font-data); 
+            font-size: 0.8rem; font-weight: bold; color: var(--success); 
+            padding: 0.4rem 0.8rem; background: rgba(16, 185, 129, 0.1); border-radius: 4px; border: 1px solid rgba(16, 185, 129, 0.2);
+            transition: all 0.3s ease;
+        }
+        .status-badge .dot { height: 6px; width: 6px; background-color: var(--success); border-radius: 50%; box-shadow: 0 0 6px var(--success); animation: pulse 2s infinite; }
+        
+        /* Offline State */
+        .status-badge.offline {
+            color: var(--danger);
+            background: rgba(239, 68, 68, 0.1);
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+        .status-badge.offline .dot {
+            background-color: var(--danger);
+            box-shadow: 0 0 6px var(--danger);
+            animation: none; /* Stops blinking when offline */
+        }
+
+        .view-container { display: none; padding: 2rem; overflow-y: auto; height: calc(100vh - 70px); }
+        .view-container.active { display: block; }
+        
+        /* Grid Layouts for Tabs */
+        #view-dashboard.active, #view-diagnostics.active { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+        #view-historical.active { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; }
+        #view-telemetry.active { display: flex; flex-direction: column; gap: 1.5rem; }
+        #view-counterfactual.active { display: grid; grid-template-columns: 320px 1fr; gap: 1.5rem; height: 100%; padding-bottom: 2rem; }
+
+        .panel { background-color: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 8px; padding: 1.5rem; display: flex; flex-direction: column; }
+        .panel-header { font-size: 0.85rem; text-transform: uppercase; color: var(--text-main); font-weight: 700; letter-spacing: 0.5px; }
+        .panel-desc { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.3rem; margin-bottom: 1rem; }
+        
+        .chart-container { position: relative; flex: 1; width: 100%; min-height: 220px; }
+        .col-span-1 { grid-column: span 1; }
+        .col-span-2 { grid-column: span 2; }
+        .col-span-3 { grid-column: span 3; }
+
+        /* --- Typography & Tables --- */
+        .data-val { font-family: var(--font-data); font-size: 2rem; font-weight: bold; color: var(--text-main); }
+        .data-unit { font-size: 0.8rem; color: var(--text-muted); font-family: var(--font-ui); font-weight: normal; }
+        
+        /* --- UI Controls --- */
+        .form-label { display: block; font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.4rem; text-transform: uppercase; font-weight: 600;}
+        .form-select { width: 100%; padding: 0.7rem; background-color: var(--bg-base); border: 1px solid var(--border-color); color: white; border-radius: 4px; outline: none; margin-bottom: 1.2rem; font-size: 0.85rem;}
+        .btn-action { width: 100%; padding: 0.9rem; background-color: var(--text-main); color: var(--bg-base); border: none; border-radius: 4px; font-weight: 800; cursor: pointer; transition: 0.2s; text-transform: uppercase; }
+        .btn-action:hover { background-color: #d1d5db; }
+        
+        /* API Status Box */
+        .api-overlay {
+            display: none; padding: 1rem; border-radius: 4px; font-size: 0.85rem; line-height: 1.5; margin-top: 1rem;
+            background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: var(--warning);
+        }
+
+        /* Coming Soon Styling */
+        .coming-soon-content {
+            display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; text-align: center; padding: 3rem;
+        }
+        .coming-soon-content h2 { font-size: 2.5rem; text-transform: uppercase; margin-bottom: 1rem; color: var(--text-muted); }
+        .coming-soon-content p { color: #5a5f73; font-size: 1.1rem; }
+
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div id="landing-page">
+        <div class="grid-bg"></div>
+        <div class="landing-content">
+            <h1 class="landing-title">Virtual <span>Pitwall</span></h1>
+            <p class="landing-desc">
+                Predictive Race Strategy using Machine Learning. <br>
+                A professional frontend interface for F1 telemetry analysis, forecasting lap times, and calculating optimal pit windows.
+            </p>
+            <button class="btn-launch" onclick="launchApp()">Initialize Dashboard</button>
+        </div>
+    </div>
+
+    <div id="app-container">
+        
+        <aside class="sidebar">
+            <div class="brand">
+                <h1>Pitwall<span>.f1</span></h1>
+                <p>AI Strategy Analyst</p>
+            </div>
+            <nav class="nav-menu">
+                <div class="nav-section">Race Operations</div>
+                <button class="nav-item" onclick="switchTab('dashboard', this)">📈 Strategy Dashboard</button>
+                <button class="nav-item" onclick="switchTab('telemetry', this)">🏎️ Live Telemetry</button>
+                
+                <div class="nav-section">Historical Analysis</div>
+                <button class="nav-item" onclick="switchTab('historical', this)">⏪ Past Race Simulator</button>
+
+                <div class="nav-section">Model Engineering</div>
+                <button class="nav-item" onclick="switchTab('diagnostics', this)">📊 Model Diagnostics</button>
+                <button class="nav-item active" onclick="switchTab('counterfactual', this)">🤖 Counterfactual AI</button>
+            </nav>
+            <div class="team-info">
+                <strong>Developed by:</strong><br>
+                Nikhil V., Kushagra S.<br>
+                Nipu K., Apurva S.<br>
+                Pratham I., Kunal B.
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="header">
+                <div>
+                    <h2 id="header-title" style="font-size: 1.1rem; font-weight: 700;">Strategy Sandbox</h2>
+                    <p id="header-sub" style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">Counterfactual simulations for researchers.</p>
+                </div>
+                <div class="status-badge offline" id="pipeline-badge">
+                    <div class="dot" id="pipeline-dot"></div> <span id="status-text">PIPELINE OFFLINE</span>
+                </div>
+            </header>
+
+            <div id="view-dashboard" class="view-container">
+                <div class="panel col-span-3">
+                    <div class="coming-soon-content">
+                        <h2>🚧 Module In Development 🚧</h2>
+                        <p>The Strategy Dashboard is scheduled for deployment in Phase 2.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-telemetry" class="view-container">
+                <div class="panel" style="flex: 1;">
+                    <div class="coming-soon-content">
+                        <h2>🚧 Live Telemetry Feed 🚧</h2>
+                        <p>Real-time API ingestion is currently paused for local simulation testing.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-historical" class="view-container">
+                <div class="panel col-span-3">
+                    <div class="coming-soon-content">
+                        <h2>🚧 Historical Archive Offline 🚧</h2>
+                        <p>Past Race Simulator database integration is pending.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-diagnostics" class="view-container">
+                <div class="panel col-span-3">
+                    <div class="coming-soon-content">
+                        <h2>🚧 Diagnostics Panel 🚧</h2>
+                        <p>Model Health visualizers will be available in the next build.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="view-counterfactual" class="view-container active">
+                <div class="panel">
+                    <div class="panel-header">Scenario Builder</div>
+                    <div class="panel-desc" style="margin-bottom: 2rem;">Simulate alternate pit strategies using the LSTM neural network.</div>
+                    
+                    <label class="form-label">Target Driver</label>
+                    <select class="form-select" id="cf-driver">
+                        <option value="ANT">12 - Andrea Kimi Antonelli</option>
+                        <option value="HAM">44 - Lewis Hamilton</option>
+                        <option value="RUS">63 - George Russell</option>
+                    </select>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0 1rem;">
+                        <div>
+                            <label class="form-label">Total Race Laps</label>
+                            <input type="number" class="form-select" id="cf-total-laps" value="50">
+                        </div>
+                        <div>
+                            <label class="form-label">Current Lap</label>
+                            <input type="number" class="form-select" id="cf-current-lap" value="18">
+                        </div>
+                        <div>
+                            <label class="form-label">Current Compound</label>
+                            <select class="form-select" id="cf-current-compound">
+                                <option value="SOFT">Soft</option>
+                                <option value="MEDIUM" selected>Medium</option>
+                                <option value="HARD">Hard</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="form-label">Tire Age (Laps)</label>
+                            <input type="number" class="form-select" id="cf-tire-age" value="15">
+                        </div>
+                    </div>
+
+                    <label class="form-label">Target Pit Compound</label>
+                    <select class="form-select" id="cf-target-compound">
+                        <option value="HARD">Box for Hards</option>
+                        <option value="MEDIUM">Box for Mediums</option>
+                        <option value="SOFT">Box for Softs</option>
+                    </select>
+
+                    <button class="btn-action" id="btn-run-sim" onclick="runCounterfactualSim()">Run AI Race Simulation</button>
+
+                    <div id="api-status" class="api-overlay">
+                        <strong>⚠️ API Connection Refused</strong><br>
+                        Please ensure the backend server hosting the LSTM model is running.
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <div class="panel-header">Strategy Topography Map</div>
+                    <div class="panel-desc">Visualizing total race time across all possible pit lap choices. Lowest point indicates mathematical optimal.</div>
+                    <div class="chart-container"><canvas id="counterfactualChart"></canvas></div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        // Set Chart.js Professional Theme defaults
+        Chart.defaults.color = '#8b92a5';
+        Chart.defaults.font.family = "'Roboto Mono', monospace";
+        Chart.defaults.plugins.tooltip.backgroundColor = '#15171e';
+        Chart.defaults.plugins.tooltip.borderColor = '#2a2d3d';
+        Chart.defaults.plugins.tooltip.borderWidth = 1;
+
+        let chartsInitialized = false;
+
+        // --- View Transitions ---
+        function launchApp() {
+            document.getElementById('landing-page').style.opacity = '0';
+            setTimeout(() => {
+                document.getElementById('landing-page').style.display = 'none';
+                document.getElementById('app-container').style.display = 'flex';
+                if (!chartsInitialized) { initAllCharts(); chartsInitialized = true; }
+            }, 600);
+        }
+
+        function switchTab(tabId, btnElement) {
+            document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+            btnElement.classList.add('active');
+
+            document.querySelectorAll('.view-container').forEach(view => view.classList.remove('active'));
+            document.getElementById('view-' + tabId).classList.add('active');
+
+            const title = document.getElementById('header-title');
+            const sub = document.getElementById('header-sub');
+            
+            if(tabId === 'dashboard') { title.textContent = "Race Strategy Overview"; sub.textContent = "Module pending release."; }
+            else if(tabId === 'telemetry') { title.textContent = "Raw Telemetry Feed"; sub.textContent = "Module pending release."; }
+            else if(tabId === 'historical') { title.textContent = "Historical Race Simulator"; sub.textContent = "Module pending release."; }
+            else if(tabId === 'diagnostics') { title.textContent = "Model Health & Diagnostics"; sub.textContent = "Module pending release."; }
+            else if(tabId === 'counterfactual') { title.textContent = "Strategy Sandbox"; sub.textContent = "Counterfactual simulations for researchers."; }
+        }
+
+        // --- Server Heartbeat Check ---
+        async function checkPipelineStatus() {
+            const badge = document.getElementById('pipeline-badge');
+            const statusText = document.getElementById('status-text');
+            
+            try {
+                // Time out quickly so the UI doesn't hang if the server is off
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+                const response = await fetch('http://127.0.0.1:8000/api/health', { 
+                    signal: controller.signal 
+                });
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    badge.classList.remove('offline');
+                    statusText.textContent = "PIPELINE ACTIVE";
+                } else {
+                    throw new Error("Server not OK");
+                }
+            } catch (error) {
+                // If the fetch fails, turn the badge red
+                badge.classList.add('offline');
+                statusText.textContent = "PIPELINE OFFLINE";
+            }
+        }
+
+        // Start checking server health immediately, then ping every 5 seconds
+        checkPipelineStatus();
+        setInterval(checkPipelineStatus, 5000);
+
+
+        // --- Real Backend Connection ---
+        async function runCounterfactualSim() {
+            const btn = document.getElementById('btn-run-sim');
+            const statusBox = document.getElementById('api-status');
+
+            btn.textContent = "Processing Neural Network...";
+            btn.disabled = true; 
+            statusBox.style.display = 'none';
+
+            try {
+                const response = await fetch('http://127.0.0.1:8000/api/simulate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        driver: document.getElementById('cf-driver').value,
+                        total_laps: parseInt(document.getElementById('cf-total-laps').value),
+                        current_lap: parseInt(document.getElementById('cf-current-lap').value),
+                        current_compound: document.getElementById('cf-current-compound').value,
+                        current_tyre_age: parseInt(document.getElementById('cf-tire-age').value),
+                        target_compound: document.getElementById('cf-target-compound').value
+                    })
+                });
+
+                if (!response.ok) throw new Error("Backend connection failed");
+
+                const aiData = await response.json();
+
+                if (aiData.status === "error") {
+                    throw new Error(aiData.message);
+                }
+
+                btn.textContent = "Simulation Complete";
+                btn.style.backgroundColor = "var(--success)"; 
+                
+                statusBox.className = 'api-overlay';
+                statusBox.style.display = 'block';
+                statusBox.style.background = 'rgba(16, 185, 129, 0.1)';
+                statusBox.style.border = '1px solid var(--success)';
+                statusBox.style.color = 'var(--success)';
+                statusBox.innerHTML = `<strong>✅ AI Strategy Generated</strong><br>${aiData.message}`;
+
+                const chartInstance = Chart.getChart('counterfactualChart'); 
+                if (chartInstance) {
+                    chartInstance.data.labels = aiData.chart_labels;
+                    chartInstance.data.datasets[0].data = aiData.chart_data;
+                    chartInstance.data.datasets[0].label = "Total Simulated Race Time (sec)";
+                    chartInstance.update();
+                }
+
+            } catch (error) {
+                console.error("API Error:", error);
+                btn.textContent = "Run AI Race Simulation";
+                
+                statusBox.className = 'api-overlay';
+                statusBox.style.display = 'block';
+                statusBox.style.background = 'rgba(245, 158, 11, 0.1)';
+                statusBox.style.border = '1px solid rgba(245, 158, 11, 0.3)';
+                statusBox.style.color = 'var(--warning)';
+                statusBox.innerHTML = `<strong>⚠️ System Warning</strong><br>${error.message || "Please ensure the Python backend server is running on port 8000."}`;
+            } finally {
+                setTimeout(() => { 
+                    btn.disabled = false; 
+                    btn.textContent = "Run AI Race Simulation";
+                    btn.style.backgroundColor = "var(--text-main)";
+                }, 5000); 
+            }
+        }
+
+        // --- Cleaned up Chart Initialization ---
+        function initAllCharts() {
+            const ctx = document.getElementById('counterfactualChart').getContext('2d');
+            new Chart(ctx, { 
+                type: 'line', 
+                data: { 
+                    labels: ['Awaiting Input'], 
+                    datasets: [ { 
+                        label: 'Total Simulated Race Time', 
+                        data: [0], 
+                        borderColor: '#00d2be', 
+                        borderWidth: 2,
+                        pointBackgroundColor: '#15171e',
+                        pointBorderColor: '#00d2be',
+                        pointRadius: 4,
+                        tension: 0.2 
+                    } ] 
+                }, 
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            grid: { color: '#1f222b', drawBorder: false },
+                            title: { display: true, text: 'Simulated Time (Seconds)'}
+                        },
+                        x: {
+                            grid: { color: '#1f222b', drawBorder: false },
+                            title: { display: true, text: 'Lap Chosen to Box'}
+                        }
+                    }
+                } 
+            });
+        }
+    </script>
+</body>
+</html>
