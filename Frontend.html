@@ -345,7 +345,7 @@
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 2000);
 
-                const response = await fetch('http://127.0.0.1:8000/api/health', { 
+                const response = await fetch('https://virtual-pit-wall-api.onrender.com/api/health', { 
                     signal: controller.signal 
                 });
                 clearTimeout(timeoutId);
@@ -378,7 +378,7 @@
             statusBox.style.display = 'none';
 
             try {
-                const response = await fetch('http://127.0.0.1:8000/api/simulate', {
+                const response = await fetch('https://virtual-pit-wall-api.onrender.com', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
