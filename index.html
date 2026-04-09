@@ -26,6 +26,10 @@
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: var(--font-ui); }
+        
+        /* * By default on desktop, we lock the body height and hide overflow 
+         * to make the sidebar fixed and the right panel scrollable.
+         */
         body { background-color: var(--bg-base); color: var(--text-main); height: 100vh; overflow: hidden; }
 
         /* ==========================================
@@ -155,7 +159,12 @@
 
         /* MOBILE STYLES (Screens smaller than 768px) */
         @media (max-width: 768px) {
-            #app-container { flex-direction: column; } 
+            /* --- THE SCROLLING FIX --- */
+            /* Unlock the body height to allow native vertical scrolling on phones */
+            body { height: auto; overflow-y: auto; }
+            #app-container { height: auto; flex-direction: column; }
+            .view-container { height: auto; overflow-y: visible; padding: 1rem; }
+            /* ------------------------- */
             
             .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border-color); }
             .brand { padding: 1rem; }
@@ -169,7 +178,6 @@
             
             #view-dashboard.active, #view-diagnostics.active, #view-historical.active, #view-counterfactual.active { 
                 grid-template-columns: 1fr; 
-                padding: 1rem;
             }
             .col-span-1, .col-span-2, .col-span-3 { grid-column: span 1 !important; }
             
@@ -179,7 +187,6 @@
             
             .landing-title { font-size: 2.5rem; }
             .data-val { font-size: 1.5rem; }
-            .view-container { padding: 1rem; height: calc(100vh - 140px); }
         }
     </style>
 </head>
