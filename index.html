@@ -157,12 +157,10 @@
 
         /* MOBILE STYLES (Screens smaller than 768px) */
         @media (max-width: 768px) {
-            /* --- THE SCROLLING AND WIDTH FIX --- */
             /* Force hiding of horizontal scroll and allow vertical */
             body, html { height: auto; overflow-y: auto; overflow-x: hidden; width: 100%; }
             #app-container { height: auto; flex-direction: column; width: 100%; overflow-x: hidden; }
             .view-container { height: auto; overflow-y: visible; overflow-x: hidden; padding: 1rem; width: 100%; }
-            /* ------------------------- */
             
             .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border-color); }
             .brand { padding: 1rem; }
@@ -187,11 +185,10 @@
             .landing-title { font-size: 2.2rem; }
             .data-val { font-size: 1.5rem; }
 
-            /* FIX FOR THE MASSIVE 'COMING SOON' TEXT AND BOXES */
             .coming-soon-content { padding: 1rem; }
             .coming-soon-content h2 { font-size: 1.4rem; margin-bottom: 0.5rem; }
             .coming-soon-content p { font-size: 0.9rem; }
-            .panel { padding: 1rem; } /* Slightly tighter padding for panels on mobile */
+            .panel { padding: 1rem; } 
         }
     </style>
 </head>
@@ -387,7 +384,8 @@
             
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 2000);
+                // INCREASING TIMEOUT TO 10 SECONDS TO FIX FALSE OFFLINE BADGE
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
 
                 const response = await fetch('https://virtual-pit-wall-api.onrender.com/api/health', { 
                     signal: controller.signal 
